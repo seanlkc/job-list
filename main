@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-HK" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minimal Job Board</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f1115',
+                        panelbg: '#1a1d24',
+                        cardbg: '#252932',
+                        accent: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f1115;
+            color: #e5e7eb;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .sortable-ghost {
+            opacity: 0.3;
+            transform: scale(0.98);
+        }
+        
+        .job-card {
+            touch-action: pan-y;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .job-card:active {
+            cursor: grabbing;
+        }
+
+        /* Glassmorphism for modals */
+        .glass {
+            background: rgba(37, 41, 50, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-panelbg/80 backdrop-blur-md px-6 py-4 flex justify-between items-center shrink-0 z-10">
+        <h1 class="text-xl font-bold tracking-tight flex items-center gap-2">
+            <i class="ph-fill ph-kanban text-accent text-2xl"></i>
+            WORKSPACE
+        </h1>
+        <div class="flex items-center gap-3 sm:gap-4">
+            <!-- Sync Code Display / Button -->
+            <button onclick="openSyncModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors border border-gray-700">
+                <i class="ph ph-link text-gray-400"></i>
+                <span class="hidden sm:inline text-gray-300">Share Link</span>
+            </button>
+            <!-- Add Job Button -->
+            <button onclick="openAddModal()" class="bg-accent hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 active:scale-95">
+                <i class="ph-bold ph-plus"></i>
+                <span class="hidden sm:inline">Add Job</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Board -->
+    <main class="flex-1 overflow-hidden relative">
+        <div id="loadingOverlay" class="absolute inset-0 bg-darkbg/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
+            <i class="ph ph-spinner-gap animate-spin text-4xl text-accent mb-4"></i>
+            <p class="text-gray-400 font-medium">Syncing data...</p>
+        </div>
+
+        <!-- Changed from flex row to a 2x2 grid on desktop, stacking vertically on mobile -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-4 sm:gap-6 p-4 sm:p-6 h-full overflow-y-auto sm:overflow-hidden">
+            
+            <!-- Column: Urgent -->
+            <div class="flex flex-col bg-panelbg rounded-xl border border-gray-800 overflow-hidden shadow-xl min-h-[350px] sm:min-h-0">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gradient-to-r from-red-500/10 to-transparent">
+                    <h2 class="font-semibold text-gray-200 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <div class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+                        Urgent
+                    </h2>
+                    <span id="count-urgent" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
+                </div>
+                <div id="urgent" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+            </div>
+
+            <!-- Column: On-going -->
+            <div class="flex flex-col bg-panelbg rounded-xl border border-gray-800 overflow-hidden shadow-xl min-h-[350px] sm:min-h-0">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gradient-to-r from-blue-500/10 to-transparent">
+                    <h2 class="font-semibold text-gray-200 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div>
+                        On-going
+                    </h2>
+                    <span id="count-ongoing" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
+                </div>
+                <div id="ongoing" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+            </div>
+
+            <!-- Column: Feedback -->
+            <div class="flex flex-col bg-panelbg rounded-xl border border-gray-800 overflow-hidden shadow-xl min-h-[350px] sm:min-h-0">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gradient-to-r from-amber-500/10 to-transparent">
+                    <h2 class="font-semibold text-gray-200 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <div class="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
+                        Feedback
+                    </h2>
+                    <span id="count-feedback" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
+                </div>
+                <div id="feedback" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+            </div>
+
+            <!-- Column: Finished -->
+            <div class="flex flex-col bg-panelbg rounded-xl border border-gray-800 overflow-hidden shadow-xl opacity-75 hover:opacity-100 transition-opacity min-h-[350px] sm:min-h-0">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gradient-to-r from-gray-500/10 to-transparent">
+                    <h2 class="font-semibold text-gray-400 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <div class="w-2 h-2 rounded-full bg-gray-500 shadow-[0_0_8px_rgba(107,114,128,0.5)]"></div>
+                        FINISHED
+                    </h2>
+                    <span id="count-finished" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
+                </div>
+                <div id="finished" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modals -->
+    
+    <!-- 1. Add Job Modal -->
+    <div id="addModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-opacity">
+        <div class="glass rounded-xl w-full max-w-md overflow-hidden transform transition-all shadow-2xl border border-gray-700">
+            <div class="px-6 py-5 flex justify-between items-center border-b border-gray-700/50">
+                <h3 class="text-lg font-semibold text-gray-100 tracking-wide">New Task</h3>
+                <button onclick="closeAddModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="ph-bold ph-x text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <form id="addJobForm" onsubmit="submitJob(event)">
+                    <textarea id="jobText" rows="3" class="w-full bg-darkbg border border-gray-700 rounded-lg p-3 text-gray-200 focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none placeholder-gray-600 transition-all" placeholder="What's the next big thing?" required></textarea>
+                    <div class="flex justify-end gap-3 mt-5">
+                        <button type="button" onclick="closeAddModal()" class="px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50 rounded-md font-medium transition-colors">Cancel</button>
+                        <button type="submit" class="px-5 py-2 text-sm text-white bg-accent hover:bg-blue-500 rounded-md font-medium shadow-lg shadow-blue-500/20 transition-all">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Custom Delete Modal -->
+    <div id="deleteModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-opacity">
+        <div class="glass rounded-xl w-full max-w-sm overflow-hidden transform transition-all shadow-2xl border border-red-500/20">
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                    <i class="ph-fill ph-warning-circle text-3xl text-red-500"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-100 mb-2">Delete this task?</h3>
+                <p class="text-sm text-gray-400 mb-6">This action cannot be undone.</p>
+                <div class="flex gap-3 w-full">
+                    <button onclick="closeDeleteModal()" class="flex-1 py-2.5 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-md font-medium transition-colors">Cancel</button>
+                    <button onclick="confirmDelete()" class="flex-1 py-2.5 text-sm text-white bg-red-500 hover:bg-red-600 rounded-md font-medium shadow-lg shadow-red-500/20 transition-all">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Sync Settings Modal -->
+    <div id="syncModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-opacity">
+        <div class="glass rounded-xl w-full max-w-md overflow-hidden transform transition-all shadow-2xl border border-gray-700">
+            <div class="px-6 py-5 flex justify-between items-center border-b border-gray-700/50">
+                <h3 class="text-lg font-semibold text-gray-100 flex items-center gap-2">
+                    <i class="ph-fill ph-link text-accent"></i> Share Board
+                </h3>
+                <button onclick="closeSyncModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="ph-bold ph-x text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-300">Copy this link and send it to your phone or other computers (e.g., via WhatsApp/AirDrop). Opening the link will instantly sync your board!</p>
+                <div>
+                    <div class="flex items-center gap-2 mt-2">
+                        <input type="text" id="modalLinkDisplay" readonly class="flex-1 bg-darkbg border border-gray-700 rounded-lg p-3 text-sm text-gray-400 outline-none truncate" value="https://...">
+                        <button onclick="copySyncLink()" class="p-3 bg-accent hover:bg-blue-500 rounded-lg text-white shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2" title="Copy Link">
+                            <i class="ph ph-copy text-xl"></i>
+                            <span class="font-medium">Copy</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Firebase Scripts -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // --- Configuration ---
+        const columns = ['urgent', 'ongoing', 'feedback', 'finished'];
+        let jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
+        
+        // Setup URL Syncing
+        const urlParams = new URLSearchParams(window.location.search);
+        const boardFromUrl = urlParams.get('board');
+        
+        let currentBoardId = boardFromUrl || localStorage.getItem('minimalBoardSyncCode');
+        let unsubscribeSnapshot = null;
+        
+        // Modal State
+        let jobToDelete = null; 
+        
+        // UI Elements
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const modalLinkDisplay = document.getElementById('modalLinkDisplay');
+
+        // --- Firebase & Local Fallback Init ---
+        // 💡 GitHub Pages 部署提示：
+        // 如果你想喺 GitHub Pages 做到「跨裝置/手機電腦同步」，你需要填入自己嘅 Firebase Config。
+        // 1. 去 firebase.google.com 免費開個 Project
+        // 2. 開啟 Firestore Database 同埋 Authentication (啟用 Anonymous 匿名登入)
+        // 3. 將下面嘅 firebaseConfig 換成你嘅資料 (取消註解)
+        
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyAgWHPnYu9I3mo72vIV3FNBMBdgD62ZtHo",
+            authDomain: "job-list-78f35.firebaseapp.com",
+            projectId: "job-list-78f35",
+            storageBucket: "job-list-78f35.firebasestorage.app",
+            messagingSenderId: "145504118618",
+            appId: "1:145504118618:web:86b45fa741f0d4cd20b563"
+        };
+
+        let useFirebase = false;
+        let db = null;
+        let auth = null;
+        let appId = 'my-personal-kanban'; // 你可以自己改呢個名
+
+        try {
+            // 優先檢查系統測試環境 (而家預覽用)
+            if (typeof __firebase_config !== 'undefined') {
+                const envConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(envConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                useFirebase = true;
+            } 
+            // 檢查你有冇填入自己嘅 Firebase 設定 (放上 GitHub 後用)
+            else if (myFirebaseConfig.apiKey) {
+                const app = initializeApp(myFirebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                useFirebase = true;
+                console.log("Connected to personal Firebase!");
+            } else {
+                console.log("No Firebase config found. Running in local Offline Mode.");
+            }
+        } catch (e) {
+            console.log("Init error, falling back to local mode:", e);
+        }
+
+        // Generate a random 6 char alphanumeric code
+        function generateCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        async function initAuth() {
+            if (!useFirebase) {
+                loadingOverlay.classList.add('hidden');
+                initBoard();
+                return;
+            }
+            
+            loadingOverlay.classList.remove('hidden');
+            try {
+                // 優先使用系統測試 Token
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    // 如果用自己嘅 Firebase，就會行呢度 (需要喺 Firebase Console 開啟 Anonymous 登入)
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                useFirebase = false; // Fallback to local if auth fails
+                initBoard();
+            }
+        }
+
+        function initBoard() {
+            // If no board ID in local storage or URL, create one
+            if (!currentBoardId) {
+                currentBoardId = generateCode();
+                localStorage.setItem('minimalBoardSyncCode', currentBoardId);
+                
+                // Create empty default data for new board
+                jobs = {
+                    urgent: [],
+                    ongoing: [],
+                    feedback: [],
+                    finished: []
+                };
+                saveData(); // Save initial empty data
+            } else if (boardFromUrl) {
+                // If they came from a link, save this as their new default board
+                localStorage.setItem('minimalBoardSyncCode', currentBoardId);
+            }
+            
+            // Safely update URL (prevents crash if opened as local file:///)
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?board=' + currentBoardId;
+            try {
+                window.history.replaceState({path: newUrl}, '', newUrl);
+            } catch (e) {
+                console.log("Local file detected, skipping URL change.");
+            }
+            
+            updateLinkDisplay(newUrl);
+            listenToData();
+        }
+
+        // Start Auth process
+        initAuth();
+
+        if (useFirebase) {
+            onAuthStateChanged(auth, (user) => {
+                if (user) initBoard();
+            });
+        }
+
+        // --- Core Logic ---
+
+        function updateLinkDisplay(url) {
+            if(modalLinkDisplay) modalLinkDisplay.value = url;
+        }
+
+        // Listen for real-time updates
+        function listenToData() {
+            if (useFirebase && auth && auth.currentUser) {
+                if (unsubscribeSnapshot) unsubscribeSnapshot();
+                
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'kanban_boards', currentBoardId);
+                
+                unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+                    loadingOverlay.classList.add('hidden');
+                    if (docSnap.exists()) {
+                        jobs = docSnap.data();
+                        columns.forEach(col => { if(!jobs[col]) jobs[col] = []; });
+                    } else {
+                        jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
+                    }
+                    renderBoard();
+                }, (error) => {
+                    console.error("Snapshot error:", error);
+                });
+            } else {
+                // Local Storage Fallback
+                loadingOverlay.classList.add('hidden');
+                const localData = localStorage.getItem('local_board_' + currentBoardId);
+                if (localData) {
+                    jobs = JSON.parse(localData);
+                    columns.forEach(col => { if(!jobs[col]) jobs[col] = []; });
+                }
+                renderBoard();
+            }
+        }
+
+        // Save entire state
+        async function saveData() {
+            if (useFirebase && auth && auth.currentUser) {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'kanban_boards', currentBoardId);
+                try {
+                    await setDoc(docRef, jobs);
+                } catch (err) {
+                    console.error("Error saving:", err);
+                }
+            } else {
+                // Local Storage Fallback
+                localStorage.setItem('local_board_' + currentBoardId, JSON.stringify(jobs));
+            }
+        }
+
+        // --- UI Rendering ---
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        window.renderBoard = function() {
+            columns.forEach(colId => {
+                const container = document.getElementById(colId);
+                container.innerHTML = ''; 
+                
+                document.getElementById(`count-${colId}`).innerText = jobs[colId].length;
+
+                jobs[colId].forEach(job => {
+                    const el = document.createElement('div');
+                    el.className = 'job-card bg-cardbg p-3.5 rounded-lg border border-gray-700/50 cursor-grab hover:border-gray-500/50 flex justify-between items-start group relative';
+                    el.dataset.id = job.id;
+                    
+                    const displayTxt = escapeHtml(job.text).replace(/\n/g, '<br>');
+
+                    el.innerHTML = `
+                        <div class="pr-6 text-sm text-gray-200 break-words w-full pointer-events-none leading-relaxed">${displayTxt}</div>
+                        <button onclick="requestDelete('${colId}', '${job.id}')" class="absolute top-2.5 right-2 text-gray-500 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1.5 bg-cardbg rounded-md">
+                            <i class="ph-bold ph-trash text-base"></i>
+                        </button>
+                    `;
+                    container.appendChild(el);
+                });
+            });
+            initSortable();
+        }
+
+        // Initialize drag and drop
+        let sortables = [];
+        function initSortable() {
+            // Destroy existing instances to prevent duplicates on re-render
+            sortables.forEach(s => s.destroy());
+            sortables = [];
+
+            columns.forEach(colId => {
+                const s = new Sortable(document.getElementById(colId), {
+                    group: 'shared',
+                    animation: 250,
+                    easing: "cubic-bezier(1, 0, 0, 1)",
+                    ghostClass: 'sortable-ghost',
+                    delay: 150, 
+                    delayOnTouchOnly: true,
+                    onEnd: function (evt) {
+                        const fromCol = evt.from.id;
+                        const toCol = evt.to.id;
+                        const oldIndex = evt.oldIndex;
+                        const newIndex = evt.newIndex;
+
+                        if (fromCol === toCol && oldIndex === newIndex) return;
+
+                        const movedItem = jobs[fromCol].splice(oldIndex, 1)[0];
+                        jobs[toCol].splice(newIndex, 0, movedItem);
+                        
+                        saveData(); // Sync changes
+                    }
+                });
+                sortables.push(s);
+            });
+        }
+
+        // --- Actions (Exposed to Global Scope for HTML onclick) ---
+
+        // 1. Add Job
+        const addModal = document.getElementById('addModal');
+        const jobInput = document.getElementById('jobText');
+
+        window.openAddModal = () => {
+            addModal.classList.remove('hidden');
+            setTimeout(() => jobInput.focus(), 100);
+        }
+        window.closeAddModal = () => {
+            addModal.classList.add('hidden');
+            document.getElementById('addJobForm').reset();
+        }
+        window.submitJob = (e) => {
+            e.preventDefault();
+            const text = jobInput.value.trim();
+            if (!text) return;
+
+            jobs.urgent.unshift({
+                id: 'job_' + Date.now(),
+                text: text
+            });
+            
+            saveData();
+            closeAddModal();
+        }
+
+        // 2. Custom Delete Flow
+        const deleteModal = document.getElementById('deleteModal');
+        
+        window.requestDelete = (colId, jobId) => {
+            jobToDelete = { colId, jobId };
+            deleteModal.classList.remove('hidden');
+        }
+        window.closeDeleteModal = () => {
+            deleteModal.classList.add('hidden');
+            jobToDelete = null;
+        }
+        window.confirmDelete = () => {
+            if (jobToDelete) {
+                jobs[jobToDelete.colId] = jobs[jobToDelete.colId].filter(j => j.id !== jobToDelete.jobId);
+                saveData();
+                closeDeleteModal();
+            }
+        }
+
+        // 3. Sync Logic
+        const syncModal = document.getElementById('syncModal');
+
+        window.openSyncModal = () => syncModal.classList.remove('hidden');
+        window.closeSyncModal = () => syncModal.classList.add('hidden');
+        
+        window.copySyncLink = () => {
+            const linkToCopy = modalLinkDisplay.value;
+            navigator.clipboard.writeText(linkToCopy).then(() => {
+                const btnIcon = document.querySelector('button[title="Copy Link"] i');
+                const btnText = document.querySelector('button[title="Copy Link"] span');
+                btnIcon.className = 'ph-fill ph-check text-xl';
+                btnText.innerText = 'Copied!';
+                setTimeout(() => {
+                    btnIcon.className = 'ph ph-copy text-xl';
+                    btnText.innerText = 'Copy';
+                }, 2000);
+            });
+        }
+
+        // Close modals on outside click
+        [addModal, deleteModal, syncModal].forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
