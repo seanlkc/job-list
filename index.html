@@ -102,7 +102,7 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-4 sm:gap-6 p-4 sm:p-6 h-full overflow-y-auto sm:overflow-hidden">
             
-            <!-- Column Template -->
+            <!-- Column: Urgent -->
             <div class="flex flex-col bg-gray-100 dark:bg-panelbg rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-xl min-h-[350px] sm:min-h-0 transition-colors">
                 <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gradient-to-r from-red-500/5 to-transparent">
                     <h2 class="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2 text-sm uppercase tracking-wider">
@@ -136,21 +136,21 @@
                 <div id="ongoing" class="flex-1 p-4 overflow-y-auto grid grid-cols-2 gap-4 content-start no-scrollbar"></div>
             </div>
 
-            <!-- Column: Feedback -->
+            <!-- Column: Pending (Renamed from Feedback) -->
             <div class="flex flex-col bg-gray-100 dark:bg-panelbg rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm dark:shadow-xl min-h-[350px] sm:min-h-0 transition-colors">
                 <div class="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gradient-to-r from-amber-500/5 to-transparent">
                     <h2 class="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2 text-sm uppercase tracking-wider">
                         <div class="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
-                        Feedback
+                        Pending
                     </h2>
                     <div class="flex items-center gap-3">
-                        <span id="count-feedback" class="text-gray-400 dark:text-gray-500 text-xs font-mono bg-white dark:bg-darkbg px-2 py-0.5 rounded shadow-inner">0</span>
-                        <button onclick="openAddModal('feedback')" class="w-7 h-7 flex items-center justify-center bg-white dark:bg-gray-800 hover:bg-amber-500/20 hover:text-amber-500 dark:hover:text-amber-400 rounded-full transition-all active:scale-90 text-gray-400 dark:text-gray-400 border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <span id="count-pending" class="text-gray-400 dark:text-gray-500 text-xs font-mono bg-white dark:bg-darkbg px-2 py-0.5 rounded shadow-inner">0</span>
+                        <button onclick="openAddModal('pending')" class="w-7 h-7 flex items-center justify-center bg-white dark:bg-gray-800 hover:bg-amber-500/20 hover:text-amber-500 dark:hover:text-amber-400 rounded-full transition-all active:scale-90 text-gray-400 dark:text-gray-400 border border-gray-200 dark:border-gray-700 shadow-sm">
                             <i class="ph-bold ph-plus text-sm"></i>
                         </button>
                     </div>
                 </div>
-                <div id="feedback" class="flex-1 p-4 overflow-y-auto grid grid-cols-2 gap-4 content-start no-scrollbar"></div>
+                <div id="pending" class="flex-1 p-4 overflow-y-auto grid grid-cols-2 gap-4 content-start no-scrollbar"></div>
             </div>
 
             <!-- Column: Finished -->
@@ -275,8 +275,8 @@
         initTheme();
 
         // --- Config ---
-        const columns = ['urgent', 'ongoing', 'feedback', 'finished'];
-        let jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
+        const columns = ['urgent', 'ongoing', 'pending', 'finished'];
+        let jobs = { urgent: [], ongoing: [], pending: [], finished: [] };
         const accentColors = ['accent-blue', 'accent-purple', 'accent-emerald', 'accent-pink', 'accent-amber'];
         
         const urlParams = new URLSearchParams(window.location.search);
@@ -340,7 +340,7 @@
             if (!currentBoardId) {
                 currentBoardId = generateCode();
                 localStorage.setItem('minimalBoardSyncCode', currentBoardId);
-                jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
+                jobs = { urgent: [], ongoing: [], pending: [], finished: [] };
                 saveData();
             } else if (boardFromUrl) {
                 localStorage.setItem('minimalBoardSyncCode', currentBoardId);
@@ -368,7 +368,7 @@
                         jobs = docSnap.data();
                         columns.forEach(col => { if(!jobs[col]) jobs[col] = []; });
                     } else {
-                        jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
+                        jobs = { urgent: [], ongoing: [], pending: [], finished: [] };
                     }
                     renderBoard();
                 }, (error) => { console.error(error); });
@@ -410,8 +410,6 @@
                 jobs[colId].forEach((job, index) => {
                     const el = document.createElement('div');
                     const colorClass = getColorById(job.id);
-                    // Updated Light Mode: White card on Gray-100 column with shadow
-                    // Updated Dark Mode: Accentuated border and shadow
                     el.className = `job-card bg-white dark:bg-cardbg p-4 rounded-lg border border-gray-200 dark:border-gray-700/80 cursor-grab hover:border-accent hover:scale-[1.02] dark:hover:border-gray-500/50 flex items-center justify-center group relative min-h-[95px] text-center shadow-md dark:shadow-2xl transition-all ${colorClass}`;
                     el.dataset.id = job.id;
                     
