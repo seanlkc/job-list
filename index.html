@@ -248,7 +248,7 @@
         let unsubscribeSnapshot = null;
         
         // Modal & Selection State
-        let currentEditingJob = null; // { colId, jobId } or null for adding
+        let currentEditingJob = null; 
         let targetColumnForAdd = 'urgent';
         let jobToDelete = null; 
         
@@ -360,7 +360,6 @@
             return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
 
-        // Helper to get color based on ID (to stay consistent)
         function getColorById(id) {
             const num = parseInt(id.replace(/\D/g, '')) || 0;
             return accentColors[num % accentColors.length];
@@ -372,16 +371,20 @@
                 container.innerHTML = ''; 
                 document.getElementById(`count-${colId}`).innerText = jobs[colId].length;
 
-                jobs[colId].forEach(job => {
+                jobs[colId].forEach((job, index) => {
                     const el = document.createElement('div');
                     const colorClass = getColorById(job.id);
                     el.className = `job-card bg-cardbg p-4 rounded-lg border border-gray-700/50 cursor-grab hover:border-gray-500/50 flex items-center justify-center group relative min-h-[95px] text-center shadow-lg ${colorClass}`;
                     el.dataset.id = job.id;
                     
                     const displayTxt = escapeHtml(job.text).replace(/\n/g, '<br>');
+                    // Added numbering (index + 1)
+                    const taskNumber = index + 1;
 
                     el.innerHTML = `
-                        <div class="text-sm sm:text-base text-gray-100 break-words w-full pointer-events-none font-bold tracking-wide">${displayTxt}</div>
+                        <div class="text-sm sm:text-base text-gray-100 break-words w-full pointer-events-none font-bold tracking-wide">
+                            <span class="text-accent/80 mr-1">${taskNumber}.</span> ${displayTxt}
+                        </div>
                         <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onclick="requestEdit('${colId}', '${job.id}')" class="text-gray-400 hover:text-accent p-1.5 bg-darkbg/80 rounded-md backdrop-blur-sm transition-colors">
                                 <i class="ph-bold ph-pencil-simple text-sm"></i>
@@ -424,7 +427,6 @@
             });
         }
 
-        // --- Modal Control ---
         const jobModal = document.getElementById('jobModal');
         const jobInput = document.getElementById('jobText');
         const modalTitle = document.getElementById('modalTitle');
@@ -466,11 +468,9 @@
             if (!text) return;
 
             if (currentEditingJob) {
-                // Update
                 const job = jobs[currentEditingJob.colId].find(j => j.id === currentEditingJob.jobId);
                 if (job) job.text = text;
             } else {
-                // Add
                 jobs[targetColumnForAdd].unshift({
                     id: 'job_' + Date.now() + Math.floor(Math.random()*1000),
                     text: text
@@ -481,7 +481,6 @@
             closeJobModal();
         }
 
-        // --- Delete Control ---
         const deleteModal = document.getElementById('deleteModal');
         window.requestDelete = (colId, jobId) => {
             jobToDelete = { colId, jobId };
@@ -499,7 +498,6 @@
             }
         }
 
-        // --- Sync Control ---
         const syncModal = document.getElementById('syncModal');
         window.openSyncModal = () => syncModal.classList.remove('hidden');
         window.closeSyncModal = () => syncModal.classList.add('hidden');
