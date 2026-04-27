@@ -91,7 +91,7 @@
             <p class="text-gray-400 font-medium">Syncing data...</p>
         </div>
 
-        <!-- Changed from flex row to a 2x2 grid on desktop, stacking vertically on mobile -->
+        <!-- 2x2 Grid for Columns -->
         <div class="grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-4 sm:gap-6 p-4 sm:p-6 h-full overflow-y-auto sm:overflow-hidden">
             
             <!-- Column: Urgent -->
@@ -103,7 +103,8 @@
                     </h2>
                     <span id="count-urgent" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
                 </div>
-                <div id="urgent" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+                <!-- Inner Grid: 2 columns for jobs -->
+                <div id="urgent" class="flex-1 p-3 overflow-y-auto grid grid-cols-2 gap-3 content-start no-scrollbar"></div>
             </div>
 
             <!-- Column: On-going -->
@@ -115,7 +116,7 @@
                     </h2>
                     <span id="count-ongoing" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
                 </div>
-                <div id="ongoing" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+                <div id="ongoing" class="flex-1 p-3 overflow-y-auto grid grid-cols-2 gap-3 content-start no-scrollbar"></div>
             </div>
 
             <!-- Column: Feedback -->
@@ -127,7 +128,7 @@
                     </h2>
                     <span id="count-feedback" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
                 </div>
-                <div id="feedback" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+                <div id="feedback" class="flex-1 p-3 overflow-y-auto grid grid-cols-2 gap-3 content-start no-scrollbar"></div>
             </div>
 
             <!-- Column: Finished -->
@@ -139,7 +140,7 @@
                     </h2>
                     <span id="count-finished" class="text-gray-500 text-xs font-mono bg-darkbg px-2 py-0.5 rounded">0</span>
                 </div>
-                <div id="finished" class="flex-1 p-3 overflow-y-auto space-y-3 min-h-[150px] no-scrollbar"></div>
+                <div id="finished" class="flex-1 p-3 overflow-y-auto grid grid-cols-2 gap-3 content-start no-scrollbar"></div>
             </div>
 
         </div>
@@ -158,7 +159,7 @@
             </div>
             <div class="p-6">
                 <form id="addJobForm" onsubmit="submitJob(event)">
-                    <textarea id="jobText" rows="3" class="w-full bg-darkbg border border-gray-700 rounded-lg p-3 text-gray-200 focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none placeholder-gray-600 transition-all" placeholder="What's the next big thing?" required></textarea>
+                    <textarea id="jobText" rows="2" class="w-full bg-darkbg border border-gray-700 rounded-lg p-3 text-gray-200 focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none placeholder-gray-600 transition-all" placeholder="Enter task name... (Press Enter to add)" required></textarea>
                     <div class="flex justify-end gap-3 mt-5">
                         <button type="button" onclick="closeAddModal()" class="px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50 rounded-md font-medium transition-colors">Cancel</button>
                         <button type="submit" class="px-5 py-2 text-sm text-white bg-accent hover:bg-blue-500 rounded-md font-medium shadow-lg shadow-blue-500/20 transition-all">Create</button>
@@ -222,27 +223,16 @@
         const columns = ['urgent', 'ongoing', 'feedback', 'finished'];
         let jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
         
-        // Setup URL Syncing
         const urlParams = new URLSearchParams(window.location.search);
         const boardFromUrl = urlParams.get('board');
         
         let currentBoardId = boardFromUrl || localStorage.getItem('minimalBoardSyncCode');
         let unsubscribeSnapshot = null;
-        
-        // Modal State
         let jobToDelete = null; 
         
-        // UI Elements
         const loadingOverlay = document.getElementById('loadingOverlay');
         const modalLinkDisplay = document.getElementById('modalLinkDisplay');
 
-        // --- Firebase & Local Fallback Init ---
-        // 💡 GitHub Pages 部署提示：
-        // 如果你想喺 GitHub Pages 做到「跨裝置/手機電腦同步」，你需要填入自己嘅 Firebase Config。
-        // 1. 去 firebase.google.com 免費開個 Project
-        // 2. 開啟 Firestore Database 同埋 Authentication (啟用 Anonymous 匿名登入)
-        // 3. 將下面嘅 firebaseConfig 換成你嘅資料 (取消註解)
-        
         const myFirebaseConfig = {
             apiKey: "AIzaSyAgWHPnYu9I3mo72vIV3FNBMBdgD62ZtHo",
             authDomain: "job-list-78f35.firebaseapp.com",
@@ -255,10 +245,9 @@
         let useFirebase = false;
         let db = null;
         let auth = null;
-        let appId = 'my-personal-kanban'; // 你可以自己改呢個名
+        let appId = 'my-personal-kanban'; 
 
         try {
-            // 優先檢查系統測試環境 (而家預覽用)
             if (typeof __firebase_config !== 'undefined') {
                 const envConfig = JSON.parse(__firebase_config);
                 const app = initializeApp(envConfig);
@@ -267,21 +256,16 @@
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
                 useFirebase = true;
             } 
-            // 檢查你有冇填入自己嘅 Firebase 設定 (放上 GitHub 後用)
             else if (myFirebaseConfig.apiKey) {
                 const app = initializeApp(myFirebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
                 useFirebase = true;
-                console.log("Connected to personal Firebase!");
-            } else {
-                console.log("No Firebase config found. Running in local Offline Mode.");
             }
         } catch (e) {
-            console.log("Init error, falling back to local mode:", e);
+            console.log("Init error:", e);
         }
 
-        // Generate a random 6 char alphanumeric code
         function generateCode() {
             return Math.random().toString(36).substring(2, 8).toUpperCase();
         }
@@ -295,52 +279,37 @@
             
             loadingOverlay.classList.remove('hidden');
             try {
-                // 優先使用系統測試 Token
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    // 如果用自己嘅 Firebase，就會行呢度 (需要喺 Firebase Console 開啟 Anonymous 登入)
                     await signInAnonymously(auth);
                 }
             } catch (error) {
                 console.error("Auth error:", error);
-                useFirebase = false; // Fallback to local if auth fails
+                useFirebase = false;
                 initBoard();
             }
         }
 
         function initBoard() {
-            // If no board ID in local storage or URL, create one
             if (!currentBoardId) {
                 currentBoardId = generateCode();
                 localStorage.setItem('minimalBoardSyncCode', currentBoardId);
-                
-                // Create empty default data for new board
-                jobs = {
-                    urgent: [],
-                    ongoing: [],
-                    feedback: [],
-                    finished: []
-                };
-                saveData(); // Save initial empty data
+                jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
+                saveData();
             } else if (boardFromUrl) {
-                // If they came from a link, save this as their new default board
                 localStorage.setItem('minimalBoardSyncCode', currentBoardId);
             }
             
-            // Safely update URL (prevents crash if opened as local file:///)
             const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?board=' + currentBoardId;
             try {
                 window.history.replaceState({path: newUrl}, '', newUrl);
-            } catch (e) {
-                console.log("Local file detected, skipping URL change.");
-            }
+            } catch (e) {}
             
             updateLinkDisplay(newUrl);
             listenToData();
         }
 
-        // Start Auth process
         initAuth();
 
         if (useFirebase) {
@@ -349,19 +318,14 @@
             });
         }
 
-        // --- Core Logic ---
-
         function updateLinkDisplay(url) {
             if(modalLinkDisplay) modalLinkDisplay.value = url;
         }
 
-        // Listen for real-time updates
         function listenToData() {
             if (useFirebase && auth && auth.currentUser) {
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
-                
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'kanban_boards', currentBoardId);
-                
                 unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                     loadingOverlay.classList.add('hidden');
                     if (docSnap.exists()) {
@@ -371,11 +335,8 @@
                         jobs = { urgent: [], ongoing: [], feedback: [], finished: [] };
                     }
                     renderBoard();
-                }, (error) => {
-                    console.error("Snapshot error:", error);
-                });
+                }, (error) => { console.error(error); });
             } else {
-                // Local Storage Fallback
                 loadingOverlay.classList.add('hidden');
                 const localData = localStorage.getItem('local_board_' + currentBoardId);
                 if (localData) {
@@ -386,50 +347,39 @@
             }
         }
 
-        // Save entire state
         async function saveData() {
             if (useFirebase && auth && auth.currentUser) {
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'kanban_boards', currentBoardId);
                 try {
                     await setDoc(docRef, jobs);
-                } catch (err) {
-                    console.error("Error saving:", err);
-                }
+                } catch (err) { console.error(err); }
             } else {
-                // Local Storage Fallback
                 localStorage.setItem('local_board_' + currentBoardId, JSON.stringify(jobs));
             }
         }
 
-        // --- UI Rendering ---
-
         function escapeHtml(unsafe) {
-            return unsafe
-                 .replace(/&/g, "&amp;")
-                 .replace(/</g, "&lt;")
-                 .replace(/>/g, "&gt;")
-                 .replace(/"/g, "&quot;")
-                 .replace(/'/g, "&#039;");
+            return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
 
         window.renderBoard = function() {
             columns.forEach(colId => {
                 const container = document.getElementById(colId);
                 container.innerHTML = ''; 
-                
                 document.getElementById(`count-${colId}`).innerText = jobs[colId].length;
 
                 jobs[colId].forEach(job => {
                     const el = document.createElement('div');
-                    el.className = 'job-card bg-cardbg p-3.5 rounded-lg border border-gray-700/50 cursor-grab hover:border-gray-500/50 flex justify-between items-start group relative';
+                    // Styling updated: flex centered, taller cards, bigger font
+                    el.className = 'job-card bg-cardbg p-4 rounded-lg border border-gray-700/50 cursor-grab hover:border-gray-500/50 flex items-center justify-center group relative min-h-[90px] text-center';
                     el.dataset.id = job.id;
                     
                     const displayTxt = escapeHtml(job.text).replace(/\n/g, '<br>');
 
                     el.innerHTML = `
-                        <div class="pr-6 text-sm text-gray-200 break-words w-full pointer-events-none leading-relaxed">${displayTxt}</div>
-                        <button onclick="requestDelete('${colId}', '${job.id}')" class="absolute top-2.5 right-2 text-gray-500 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1.5 bg-cardbg rounded-md">
-                            <i class="ph-bold ph-trash text-base"></i>
+                        <div class="text-sm sm:text-base text-gray-100 break-words w-full pointer-events-none font-bold tracking-wide">${displayTxt}</div>
+                        <button onclick="requestDelete('${colId}', '${job.id}')" class="absolute top-2 right-2 text-gray-500 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1.5 bg-cardbg/80 rounded-md backdrop-blur-sm">
+                            <i class="ph-bold ph-trash text-sm"></i>
                         </button>
                     `;
                     container.appendChild(el);
@@ -438,13 +388,10 @@
             initSortable();
         }
 
-        // Initialize drag and drop
         let sortables = [];
         function initSortable() {
-            // Destroy existing instances to prevent duplicates on re-render
             sortables.forEach(s => s.destroy());
             sortables = [];
-
             columns.forEach(colId => {
                 const s = new Sortable(document.getElementById(colId), {
                     group: 'shared',
@@ -458,24 +405,26 @@
                         const toCol = evt.to.id;
                         const oldIndex = evt.oldIndex;
                         const newIndex = evt.newIndex;
-
                         if (fromCol === toCol && oldIndex === newIndex) return;
-
                         const movedItem = jobs[fromCol].splice(oldIndex, 1)[0];
                         jobs[toCol].splice(newIndex, 0, movedItem);
-                        
-                        saveData(); // Sync changes
+                        saveData();
                     }
                 });
                 sortables.push(s);
             });
         }
 
-        // --- Actions (Exposed to Global Scope for HTML onclick) ---
-
-        // 1. Add Job
         const addModal = document.getElementById('addModal');
         const jobInput = document.getElementById('jobText');
+
+        // Handle Enter key for quick submit
+        jobInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitJob(e);
+            }
+        });
 
         window.openAddModal = () => {
             addModal.classList.remove('hidden');
@@ -486,7 +435,7 @@
             document.getElementById('addJobForm').reset();
         }
         window.submitJob = (e) => {
-            e.preventDefault();
+            if (e) e.preventDefault();
             const text = jobInput.value.trim();
             if (!text) return;
 
@@ -499,9 +448,7 @@
             closeAddModal();
         }
 
-        // 2. Custom Delete Flow
         const deleteModal = document.getElementById('deleteModal');
-        
         window.requestDelete = (colId, jobId) => {
             jobToDelete = { colId, jobId };
             deleteModal.classList.remove('hidden');
@@ -518,12 +465,9 @@
             }
         }
 
-        // 3. Sync Logic
         const syncModal = document.getElementById('syncModal');
-
         window.openSyncModal = () => syncModal.classList.remove('hidden');
         window.closeSyncModal = () => syncModal.classList.add('hidden');
-        
         window.copySyncLink = () => {
             const linkToCopy = modalLinkDisplay.value;
             navigator.clipboard.writeText(linkToCopy).then(() => {
@@ -538,15 +482,11 @@
             });
         }
 
-        // Close modals on outside click
         [addModal, deleteModal, syncModal].forEach(modal => {
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.add('hidden');
-                }
+                if (e.target === modal) modal.classList.add('hidden');
             });
         });
-
     </script>
 </body>
 </html>
